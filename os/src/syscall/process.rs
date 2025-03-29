@@ -1,6 +1,6 @@
 //! Process management syscalls
 use crate::{
-    task::{exit_current_and_run_next, suspend_current_and_run_next},
+    task::{self, exit_current_and_run_next, suspend_current_and_run_next},
     timer::get_time_us,
 };
 
@@ -38,8 +38,28 @@ pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
     0
 }
 
+#[repr(usize)]
+enum TraceRequest {
+    ReadMem = 0,
+    WriteMem = 1,
+    QuerySyscallCount = 2,
+}
+
 // TODO: implement the syscall
-pub fn sys_trace(_trace_request: usize, _id: usize, _data: usize) -> isize {
+pub fn sys_trace(trace_request: usize, id: usize, data: usize) -> isize {
     trace!("kernel: sys_trace");
-    -1
+    if trace_request == TraceRequest::ReadMem as usize {
+        let addr = id as *const u8;
+        let data = unsafe { addr.read_volatile() };
+        data as isize
+    } else if trace_request == TraceRequest::WriteMem as usize {
+        let addr = id as *mut u8;
+        unsafe { addr.write(data as u8) }
+        0
+    } else if trace_request == TraceRequest::QuerySyscallCount as usize {
+        let count = task::get_syscall_count(task::current_task_id(), id);
+        count as isize
+    } else {
+        panic!("invalid trace request value: {}", trace_request)
+    }
 }

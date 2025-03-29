@@ -17,6 +17,7 @@ mod task;
 use crate::config::MAX_APP_NUM;
 use crate::loader::{get_num_app, init_app_cx};
 use crate::sync::UPSafeCell;
+use alloc::collections::btree_map::BTreeMap;
 use lazy_static::*;
 use switch::__switch;
 pub use task::{TaskControlBlock, TaskStatus};
@@ -45,6 +46,8 @@ pub struct TaskManagerInner {
     tasks: [TaskControlBlock; MAX_APP_NUM],
     /// id of current `Running` task
     current_task: usize,
+    /// syscall count of each task
+    syscall_count: [BTreeMap<usize, usize>; MAX_APP_NUM],
 }
 
 lazy_static! {
@@ -65,6 +68,7 @@ lazy_static! {
                 UPSafeCell::new(TaskManagerInner {
                     tasks,
                     current_task: 0,
+                    syscall_count: Default::default(),
                 })
             },
         }
@@ -135,6 +139,41 @@ impl TaskManager {
             panic!("All applications completed!");
         }
     }
+
+    /// Get the id of the current task
+    fn current_task_id(&self) -> usize {
+        let inner = self.inner.exclusive_access();
+        inner.current_task
+    }
+
+    /// Count the syscall of the task
+    fn count_syscall(&self, task_id: usize, syscall_id: usize) {
+        let mut inner = self.inner.exclusive_access();
+        let count = inner.syscall_count[task_id].entry(syscall_id).or_insert(0);
+        *count += 1;
+    }
+
+    /// Get the syscall count of the task
+    fn get_syscall_count(&self, task_id: usize, syscall_id: usize) -> usize {
+        let inner = self.inner.exclusive_access();
+        let count = inner.syscall_count[task_id].get(&syscall_id).unwrap_or(&0);
+        *count
+    }
+}
+
+/// Get the syscall count of the task
+pub fn get_syscall_count(task_id: usize, syscall_id: usize) -> usize {
+    TASK_MANAGER.get_syscall_count(task_id, syscall_id)
+}
+
+/// Count the syscall of the task
+pub fn count_syscall(task_id: usize, syscall_id: usize) {
+    TASK_MANAGER.count_syscall(task_id, syscall_id);
+}
+
+/// Get the id of the current task
+pub fn current_task_id() -> usize {
+    TASK_MANAGER.current_task_id()
 }
 
 /// Run the first task in task list.
