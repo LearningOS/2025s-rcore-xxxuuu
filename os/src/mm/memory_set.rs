@@ -51,6 +51,15 @@ impl MemorySet {
     pub fn token(&self) -> usize {
         self.page_table.token()
     }
+
+    /// check if the new area is conflict with the existing areas
+    pub fn check_conflict(&self, start_va: VirtAddr, end_va: VirtAddr) -> bool {
+        let range = VPNRange::new(start_va.floor(), end_va.ceil());
+        self.areas
+            .iter()
+            .any(|area| area.vpn_range.is_overlap(&range))
+    }
+
     /// Assume that no conflicts.
     pub fn insert_framed_area(
         &mut self,
@@ -63,6 +72,22 @@ impl MemorySet {
             None,
         );
     }
+
+    /// remove a framed memory area from the memory set
+    pub fn remove_framed_area(&mut self, start_va: VirtAddr, end_va: VirtAddr) -> bool {
+        let mut remove = false;
+        self.areas.retain_mut(|area| {
+            let need_delete = area.vpn_range.get_start() == start_va.floor()
+                && area.vpn_range.get_end() == end_va.ceil();
+            if need_delete {
+                area.unmap(&mut self.page_table);
+                remove = true;
+            }
+            !need_delete
+        });
+        remove
+    }
+
     fn push(&mut self, mut map_area: MapArea, data: Option<&[u8]>) {
         map_area.map(&mut self.page_table);
         if let Some(data) = data {

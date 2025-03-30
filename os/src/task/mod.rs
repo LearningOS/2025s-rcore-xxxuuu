@@ -15,6 +15,7 @@ mod switch;
 mod task;
 
 use crate::loader::{get_app_data, get_num_app};
+use crate::mm::{MapPermission, VirtAddr};
 use crate::sync::UPSafeCell;
 use crate::trap::TrapContext;
 use alloc::vec::Vec;
@@ -153,6 +154,59 @@ impl TaskManager {
             panic!("All applications completed!");
         }
     }
+
+    /// Get the id of the current task
+    fn current_task_id(&self) -> usize {
+        let inner = self.inner.exclusive_access();
+        inner.current_task
+    }
+
+    /// Count the syscall of the task
+    fn count_syscall(&self, task_id: usize, syscall_id: usize) {
+        let mut inner = self.inner.exclusive_access();
+        inner.tasks[task_id].count_syscall(syscall_id);
+    }
+
+    /// Get the syscall count of the task
+    fn get_syscall_count(&self, task_id: usize, syscall_id: usize) -> usize {
+        let inner = self.inner.exclusive_access();
+        inner.tasks[task_id].get_syscall_count(syscall_id)
+    }
+
+    /// map a framed memory area into the memory set
+    fn map_memory(&self, start: VirtAddr, end: VirtAddr, perm: MapPermission) -> bool {
+        let mut inner = self.inner.exclusive_access();
+        let task = inner.current_task;
+        let memory_set = &mut inner.tasks[task].memory_set;
+        if memory_set.check_conflict(start, end) {
+            return false;
+        }
+        memory_set.insert_framed_area(start, end, perm);
+        true
+    }
+
+    /// unmap a framed memory area from the memory set
+    fn unmap_memory(&self, start: VirtAddr, end: VirtAddr) -> bool {
+        let mut inner = self.inner.exclusive_access();
+        let task = inner.current_task;
+        let memory_set = &mut inner.tasks[task].memory_set;
+        memory_set.remove_framed_area(start, end)
+    }
+}
+
+/// Get the syscall count of the task
+pub fn get_syscall_count(task_id: usize, syscall_id: usize) -> usize {
+    TASK_MANAGER.get_syscall_count(task_id, syscall_id)
+}
+
+/// Count the syscall of the task
+pub fn count_syscall(task_id: usize, syscall_id: usize) {
+    TASK_MANAGER.count_syscall(task_id, syscall_id);
+}
+
+/// Get the id of the current task
+pub fn current_task_id() -> usize {
+    TASK_MANAGER.current_task_id()
 }
 
 /// Run the first task in task list.
@@ -201,4 +255,14 @@ pub fn current_trap_cx() -> &'static mut TrapContext {
 /// Change the current 'Running' task's program break
 pub fn change_program_brk(size: i32) -> Option<usize> {
     TASK_MANAGER.change_current_program_brk(size)
+}
+
+/// map a framed memory area into the memory set
+pub fn map_memory(start: VirtAddr, end: VirtAddr, perm: MapPermission) -> bool {
+    TASK_MANAGER.map_memory(start, end, perm)
+}
+
+/// unmap a framed memory area from the memory set
+pub fn unmap_memory(start: VirtAddr, end: VirtAddr) -> bool {
+    TASK_MANAGER.unmap_memory(start, end)
 }

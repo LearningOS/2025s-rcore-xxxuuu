@@ -1,4 +1,6 @@
 //! Types related to task management
+use alloc::collections::btree_map::BTreeMap;
+
 use super::TaskContext;
 use crate::config::TRAP_CONTEXT_BASE;
 use crate::mm::{
@@ -28,6 +30,9 @@ pub struct TaskControlBlock {
 
     /// Program break
     pub program_brk: usize,
+
+    /// Syscall count
+    pub syscall_count: BTreeMap<usize, usize>,
 }
 
 impl TaskControlBlock {
@@ -38,6 +43,16 @@ impl TaskControlBlock {
     /// get the user token
     pub fn get_user_token(&self) -> usize {
         self.memory_set.token()
+    }
+    /// get the syscall count
+    pub fn get_syscall_count(&self, syscall_id: usize) -> usize {
+        let count = self.syscall_count.get(&syscall_id).unwrap_or(&0);
+        *count
+    }
+    /// count the syscall
+    pub fn count_syscall(&mut self, syscall_id: usize) {
+        let count = self.syscall_count.entry(syscall_id).or_insert(0);
+        *count += 1;
     }
     /// Based on the elf info in program, build the contents of task in a new address space
     pub fn new(elf_data: &[u8], app_id: usize) -> Self {
@@ -63,6 +78,7 @@ impl TaskControlBlock {
             base_size: user_sp,
             heap_bottom: user_sp,
             program_brk: user_sp,
+            syscall_count: BTreeMap::new(),
         };
         // prepare TrapContext in user space
         let trap_cx = task_control_block.get_trap_cx();
