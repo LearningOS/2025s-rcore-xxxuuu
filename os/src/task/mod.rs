@@ -23,12 +23,13 @@ mod switch;
 mod task;
 
 use crate::fs::{open_file, OpenFlags};
+use crate::{loader::get_app_data_by_name, mm::{MapPermission, VirtAddr}};
 use alloc::sync::Arc;
 pub use context::TaskContext;
 use lazy_static::*;
 pub use manager::{fetch_task, TaskManager};
 use switch::__switch;
-pub use task::{TaskControlBlock, TaskStatus};
+pub use task::{TaskControlBlock, TaskStatus, DEFAULT_TASK_PRIORITY, MIN_TASK_PRIORITY};
 
 pub use id::{kstack_alloc, pid_alloc, KernelStack, PidHandle};
 pub use manager::add_task;
@@ -119,4 +120,22 @@ lazy_static! {
 ///Add init process to the manager
 pub fn add_initproc() {
     add_task(INITPROC.clone());
+}
+
+/// map a framed memory area into the memory set
+pub fn map_memory(start: VirtAddr, end: VirtAddr, perm: MapPermission) -> bool {
+    let task = current_task().unwrap();
+    let memory_set = &mut task.inner_exclusive_access().memory_set;
+    if memory_set.check_conflict(start, end) {
+        return false;
+    }
+    memory_set.insert_framed_area(start, end, perm);
+    true
+}
+
+/// unmap a framed memory area from the memory set
+pub fn unmap_memory(start: VirtAddr, end: VirtAddr) -> bool {
+    let task = current_task().unwrap();
+    let memory_set = &mut task.inner_exclusive_access().memory_set;
+    memory_set.remove_framed_area(start, end)
 }
