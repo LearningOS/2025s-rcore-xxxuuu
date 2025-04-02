@@ -1,6 +1,5 @@
 //! Process management syscalls
 //!
-use alloc::sync::Arc;
 
 use core::mem::size_of;
 
@@ -8,7 +7,6 @@ use alloc::{collections::vec_deque::VecDeque, sync::Arc};
 
 use crate::{
     fs::{open_file, OpenFlags},
-    loader::get_app_data_by_name,
     mm::{translated_byte_buffer, translated_refmut, translated_str, MapPermission, VirtAddr},
     task::{
         self, add_task, current_task, current_user_token, exit_current_and_run_next,
@@ -213,9 +211,10 @@ pub fn sys_spawn(path: *const u8) -> isize {
 
     let token = current_user_token();
     let path = translated_str(token, path);
-    if let Some(elf_data) = get_app_data_by_name(path.as_str()) {
+    if let Some(app_inode) = open_file(path.as_str(), OpenFlags::RDONLY) {
+        let all_data = app_inode.read_all();
         let task = current_task().unwrap();
-        let child = Arc::new(TaskControlBlock::new(elf_data));
+        let child = Arc::new(TaskControlBlock::new(&all_data));
         task.set_child_process(child.clone());
         task::add_task(child.clone());
         child.getpid() as isize

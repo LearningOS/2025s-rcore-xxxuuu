@@ -23,7 +23,7 @@ mod switch;
 mod task;
 
 use crate::fs::{open_file, OpenFlags};
-use crate::{loader::get_app_data_by_name, mm::{MapPermission, VirtAddr}};
+use crate::mm::{MapPermission, VirtAddr};
 use alloc::sync::Arc;
 pub use context::TaskContext;
 use lazy_static::*;
