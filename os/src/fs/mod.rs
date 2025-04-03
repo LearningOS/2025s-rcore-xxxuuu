@@ -15,36 +15,18 @@ pub trait File: Send + Sync {
     fn read(&self, buf: UserBuffer) -> usize;
     /// write to the file from buf, return the number of bytes written
     fn write(&self, buf: UserBuffer) -> usize;
+    /// get the stat of a file
+    fn stat(&self) -> FileStat;
 }
 
-/// The stat of a inode
-#[repr(C)]
-#[derive(Debug)]
-pub struct Stat {
-    /// ID of device containing file
-    pub dev: u64,
-    /// inode number
-    pub ino: u64,
-    /// file type and mode
-    pub mode: StatMode,
-    /// number of hard links
-    pub nlink: u32,
-    /// unused pad
-    pad: [u64; 7],
+/// The stat of a file
+pub enum FileStat {
+    /// The stat of a console
+    Console,
+    /// The stat of a easy-fs file
+    EasyFsFileStat(Stat),
 }
 
-bitflags! {
-    /// The mode of a inode
-    /// whether a directory or a file
-    pub struct StatMode: u32 {
-        /// null
-        const NULL  = 0;
-        /// directory
-        const DIR   = 0o040000;
-        /// ordinary regular file
-        const FILE  = 0o100000;
-    }
-}
-
-pub use inode::{list_apps, open_file, OSInode, OpenFlags};
+pub use inode::{list_apps, open_file, link_at, unlink, OSInode, OpenFlags};
 pub use stdio::{Stdin, Stdout};
+pub use easy_fs::{Stat, StatMode};
