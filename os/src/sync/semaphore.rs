@@ -11,6 +11,7 @@ pub struct Semaphore {
 }
 
 pub struct SemaphoreInner {
+    pub max_count: usize,
     pub count: isize,
     pub wait_queue: VecDeque<Arc<TaskControlBlock>>,
 }
@@ -22,11 +23,22 @@ impl Semaphore {
         Self {
             inner: unsafe {
                 UPSafeCell::new(SemaphoreInner {
+                    max_count: res_count,
                     count: res_count as isize,
                     wait_queue: VecDeque::new(),
                 })
             },
         }
+    }
+
+    /// get the count of the semaphore
+    pub fn get_count(&self) -> isize {
+        self.inner.shared_access().count
+    }
+
+    /// get the max count of the semaphore
+    pub fn get_max_count(&self) -> usize {
+        self.inner.shared_access().max_count
     }
 
     /// up operation of semaphore

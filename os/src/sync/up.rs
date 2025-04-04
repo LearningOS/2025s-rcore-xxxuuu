@@ -4,7 +4,7 @@
 //!
 //! NOTICE: We should only use it in environment with uniprocessor（single cpu core）, and the kernel can not support task preempting in kernel mode （or trap in kernel mode）.
 
-use core::cell::{RefCell, RefMut};
+use core::{any::type_name, cell::{Ref, RefCell, RefMut}};
 
 /// Wrap a static data structure inside it so that we are
 /// able to access it without any `unsafe`.
@@ -30,6 +30,16 @@ impl<T> UPSafeCell<T> {
     }
     /// Panic if the data has been borrowed.
     pub fn exclusive_access(&self) -> RefMut<'_, T> {
-        self.inner.borrow_mut()
+        let ret = self.inner.try_borrow_mut();
+        match ret {
+            Ok(v) => v,
+            Err(_) => {
+                panic!("UPSafeCell::exclusive_access: {}'s data has been borrowed", type_name::<T>());
+            }
+        }
+    }
+    /// Read-only access to the inner data.
+    pub fn shared_access(&self) -> Ref<'_, T> {
+        self.inner.borrow()
     }
 }
